@@ -14,38 +14,57 @@ pc = Pinecone(
 		api_key=os.environ.get('PINECONE_API_KEY')
 )
 
+from pinecone import ServerlessSpec
 
-index_name='askmydoc2'
-if index_name not in pc.list_indexes().names():
-		# Do something, such as create the index
-		pc.create_index(
-				name=index_name,
-				dimension=1536,
-				metric='cosine',
-				spec=PodSpec(
-						environment='us-east-1-aws'
-				)
-		)
+cloud = os.environ.get('PINECONE_CLOUD') or 'aws'
+region = os.environ.get('PINECONE_REGION') or 'us-east-1'
 
-index = pc.describe_index(index_name)
+spec = ServerlessSpec(cloud=cloud, region=region)
 
-def find_match(input):
-    input_em = model.encode(input).tolist()
-    result = index.query(input_em, top_k=2, includeMetadata=True)
-    return result['matches'][0]['metadata']['text']+"\n"+result['matches'][1]['metadata']['text']
+index_name = 'askmydoc2'
 
-def query_refiner(conversation, query):
+import time
 
-    response = openai.Completion.create(
-    model="gpt-3.5-turbo-instruct",
-    prompt=f"Given the following user query and conversation log, formulate a question that would be the most relevant to provide the user with an answer from a knowledge base.\n\nCONVERSATION LOG: \n{conversation}\n\nQuery: {query}\n\nRefined Query:",
-    temperature=0.7,
-    max_tokens=256,
-    top_p=1,
-    frequency_penalty=0,
-    presence_penalty=0
+existing_indexes = [
+    index_info["name"] for index_info in pc.list_indexes()
+]
+
+# check if index already exists (it shouldn't if this is first time)
+if index_name not in existing_indexes:
+    # if does not exist, create index
+    pc.create_index(
+        index_name,
+        dimension=1536,  # dimensionality of minilm
+        metric='dotproduct',
+        spec=spec
     )
-    return response['choices'][0]['text']
+    # wait for index to be initialized
+    while not pc.describe_index(index_name).status['ready']:
+        time.sleep(1)
+
+# connect to index
+index = pc.Index(index_name)
+time.sleep(1)
+# view index stats
+index.describe_index_stats()
+
+# def find_match(input):
+#     input_em = model.encode(input).tolist()
+#     result = index.query(doc_search, top_k=10, includeMetadata=True)
+#     return result['matches'][0]['metadata']['text']+"\n"+result['matches'][1]['metadata']['text']
+
+# def query_refiner(conversation, query):
+
+#     response = openai.Completion.create(
+#     model="gpt-3.5-turbo-instruct",
+#     prompt=f"Given the following user query and conversation log, formulate a question that would be the most relevant to provide the user with an answer from a knowledge base.\n\nCONVERSATION LOG: \n{conversation}\n\nQuery: {query}\n\nRefined Query:",
+#     temperature=0.7,
+#     max_tokens=256,
+#     top_p=1,
+#     frequency_penalty=0,
+#     presence_penalty=0
+#     )
+#     return response['choices'][0]['text']
 
 def get_conversation_string():
     conversation_string = ""
