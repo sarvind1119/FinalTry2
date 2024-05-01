@@ -1,4 +1,3 @@
-
 import openai
 import langchain
 import pinecone
@@ -33,8 +32,8 @@ documents=chunk_data(docs=doc)
 embeddings=OpenAIEmbeddings(api_key=os.environ['OPENAI_API_KEY'])
 embeddings
 
-vectors=embeddings.embed_query("How are you?")
-len(vectors)
+# vectors=embeddings.embed_query("How are you?")
+# len(vectors)
 
 from langchain_pinecone import PineconeVectorStore
 
@@ -61,7 +60,14 @@ def retrieve_answers(query):
     print(doc_search)
     response=chain.run(input_documents=doc_search,question=query)
     return response
+import streamlit as st
+# our_query = "Please tell me some of the rules mentioned in GFR in bullet points"
+# answer= retrieve_answers(our_query)
+# print(answer)
+st.title("Question Answering App")
 
-our_query = "Summarise the procurement of manual of goods"
-answer = retrieve_answers(our_query)
-print(answer)
+user_question = st.text_input("Ask your question:")
+
+if st.button("Get Answer"):
+    answer = retrieve_answers(user_question)
+    st.write("Answer:", answer)
